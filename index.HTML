@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indiana SBDC Regional Industry Cluster Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse CDN for robust CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19; /* Deep executive dark blue/black background */
+            color: #f1f5f9;
+        }
+        
+        .title-font {
+            font-family: 'Cinzel', serif;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Gold highlights matching Purdue-inspired brand */
+        .text-purdue-gold {
+            color: #CFB991;
+        }
+        .bg-purdue-gold {
+            background-color: #CFB991;
+        }
+        .border-purdue-gold {
+            border-color: #CFB991;
+        }
+        .hover-purdue-gold:hover {
+            background-color: #bfa57a;
+            color: #000;
+        }
+
+        /* Custom premium card style */
+        .glass-card {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(207, 185, 145, 0.15);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(207, 185, 145, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(207, 185, 145, 0.1);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+            border: 1px solid rgba(207, 185, 145, 0.2);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #CFB991;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <nav class="bg-black/95 border-b-2 border-[#CFB991] sticky top-0 z-50 px-6 py-4 shadow-xl backdrop-blur-md">
+        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-[#CFB991] text-black font-black px-3.5 py-2 rounded text-xs tracking-widest uppercase title-font shadow-md shadow-[#CFB991]/20">
+                    PCRD ANALYTICS
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2 title-font">
+                        INDIANA SBDC <span class="text-[#CFB991] font-extrabold">INDUSTRY CLUSTERS</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 tracking-wide mt-0.5">Interactive Economic Specialization & Growth Analysis Dashboard</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Active SBDC Region:</span>
+                    <select id="regionSelect" onchange="updateDashboard()" class="bg-transparent text-[#CFB991] text-sm font-bold focus:outline-none cursor-pointer pr-4">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                
+                <button onclick="resetFilters()" class="text-xs bg-slate-100/10 hover:bg-slate-100/20 text-slate-300 font-semibold px-4 py-2.5 rounded-lg border border-slate-800 transition flex items-center justify-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-[#CFB991]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 11H15.6"></path></svg>
+                    Reset Filters
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <!-- Interactive Analytics Explainer Bar -->
+        <div class="glass-card p-5 rounded-xl border-l-4 border-l-[#CFB991] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1 max-w-3xl">
+                <h4 class="text-sm font-bold text-[#CFB991] uppercase tracking-wider">What is Location Quotient (LQ)?</h4>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    LQ measures regional concentration of industry employment compared to the national average. 
+                    An <strong class="text-white">LQ &ge; 1.0</strong> indicates a regional specialization and competitive advantage. 
+                    The dashboard filters, quadrants, and interactive charts below let you explore these dynamics across all 10 Indiana SBDC regions.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-900/50 p-2.5 rounded border border-slate-800/80 w-full md:w-auto">
+                <span class="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Clusters:</span>
+                <div class="relative w-full">
+                    <input type="text" id="searchQuery" onkeyup="updateDashboard()" placeholder="Search clusters..." class="w-full bg-slate-955 border border-slate-800 rounded px-3 py-1.5 pl-8 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#CFB991]">
+                    <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- High-Impact KPI Metrics Panel -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <!-- Jobs KPI -->
+            <div class="glass-card p-6 rounded-xl flex items-center justify-between relative overflow-hidden group">
+                <div class="space-y-1">
+                    <span class="text-2xs font-extrabold uppercase tracking-widest text-slate-400">Total Projected Jobs</span>
+                    <h3 id="kpiJobs" class="text-3xl font-black text-white tracking-tight mono-font">-</h3>
+                    <p class="text-2xs text-[#CFB991] font-semibold flex items-center gap-1">
+                        <span id="kpiJobsTrend" class="bg-[#CFB991]/10 text-[#CFB991] px-1.5 py-0.5 rounded">2025 Target</span>
+                    </p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900 text-[#CFB991] border border-[#CFB991]/10 group-hover:border-[#CFB991]/35 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                </div>
+            </div>
+
+            <!-- Establishments KPI -->
+            <div class="glass-card p-6 rounded-xl flex items-center justify-between relative overflow-hidden group">
+                <div class="space-y-1">
+                    <span class="text-2xs font-extrabold uppercase tracking-widest text-slate-400">Establishments</span>
+                    <h3 id="kpiEst" class="text-3xl font-black text-white tracking-tight mono-font">-</h3>
+                    <p class="text-2xs text-slate-400 font-semibold">
+                        Avg. <span id="kpiAvgSize" class="text-white font-bold">-</span> jobs per establishment
+                    </p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900 text-blue-400 border border-blue-500/10 group-hover:border-blue-500/35 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                </div>
+            </div>
+
+            <!-- Earnings KPI -->
+            <div class="glass-card p-6 rounded-xl flex items-center justify-between relative overflow-hidden group">
+                <div class="space-y-1">
+                    <span class="text-2xs font-extrabold uppercase tracking-widest text-slate-400">Avg. Earnings / Worker</span>
+                    <h3 id="kpiEarnings" class="text-3xl font-black text-emerald-400 tracking-tight mono-font">-</h3>
+                    <p class="text-2xs text-slate-400 font-semibold">Weighted by regional employment</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900 text-emerald-400 border border-emerald-500/10 group-hover:border-emerald-500/35 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M12 13c2.91 0 5.17 1.002 5.17 2.25v1.25H4v-1.25C4 14.002 6.26 13 9 13h3z"></path></svg>
+                </div>
+            </div>
+
+            <!-- Specialized Clusters KPI -->
+            <div class="glass-card p-6 rounded-xl flex items-center justify-between relative overflow-hidden group">
+                <div class="space-y-1">
+                    <span class="text-2xs font-extrabold uppercase tracking-widest text-slate-400">Specialized Clusters</span>
+                    <h3 id="kpiSpecialized" class="text-3xl font-black text-amber-500 tracking-tight mono-font">-</h3>
+                    <p class="text-2xs text-slate-400 font-semibold">
+                        Clusters with <span class="text-[#CFB991] font-bold">LQ &ge; 1.0</span>
+                    </p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900 text-amber-500 border border-amber-500/10 group-hover:border-amber-500/35 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Layout Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Chart Card: Top Jobs -->
+            <div class="glass-card p-6 rounded-xl flex flex-col h-[450px]">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white tracking-tight title-font">Top 10 Clusters by 2025 Jobs</h2>
+                        <p class="text-xs text-slate-400">Highest regional job contributors</p>
+                    </div>
+                    <span class="text-xs bg-slate-900 border border-slate-800 text-[#CFB991] font-mono px-2 py-1 rounded">2025 Jobs</span>
+                </div>
+                <div class="relative flex-grow">
+                    <canvas id="jobsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Right Chart Card: Spec vs Earnings Bubble -->
+            <div class="glass-card p-6 rounded-xl flex flex-col h-[450px]">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white tracking-tight title-font">Specialization Quotient vs. Earnings</h2>
+                        <p class="text-xs text-slate-400">Bubble size represents 2025 Jobs</p>
+                    </div>
+                    <span class="text-xs bg-slate-900 border border-slate-800 text-[#CFB991] font-mono px-2 py-1 rounded">Economic Model</span>
+                </div>
+                <div class="relative flex-grow">
+                    <canvas id="bubbleChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Growth & Specialization Trend Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Column 1 & 2: Shift-Share & Specialization Trend -->
+            <div class="glass-card p-6 rounded-xl flex flex-col lg:col-span-2 h-[420px]">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white tracking-tight title-font">Employment Concentration Trend</h2>
+                        <p class="text-xs text-slate-400">Comparing 2020 vs 2025 Location Quotients (Top 10 by Spec)</p>
+                    </div>
+                    <span class="text-2xs bg-[#CFB991]/10 text-[#CFB991] px-2 py-1 rounded font-mono">2020 vs 2025 LQ</span>
+                </div>
+                <div class="relative flex-grow">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Column 3: Regional Quadrant Matrix Count -->
+            <div class="glass-card p-6 rounded-xl flex flex-col h-[420px] justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-white tracking-tight title-font mb-1">Regional Performance Matrix</h2>
+                    <p class="text-xs text-slate-400 mb-4">Clusters grouped by specialization and trend trajectory</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 flex-grow">
+                    <!-- Champions -->
+                    <div class="p-3.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 flex flex-col justify-between hover:border-emerald-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Champions</span>
+                            <span id="quadrantChampionsCount" class="bg-emerald-500 text-black text-xs font-extrabold px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <p class="text-3xs text-slate-400 mt-2 leading-snug">LQ &ge; 1.0 & Growth &ge; 0%</p>
+                    </div>
+
+                    <!-- Emerging -->
+                    <div class="p-3.5 rounded-lg bg-blue-950/20 border border-blue-500/20 flex flex-col justify-between hover:border-blue-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Emerging</span>
+                            <span id="quadrantEmergingCount" class="bg-blue-500 text-black text-xs font-extrabold px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <p class="text-3xs text-slate-400 mt-2 leading-snug">LQ &lt; 1.0 & Growth &ge; 0%</p>
+                    </div>
+
+                    <!-- Mature -->
+                    <div class="p-3.5 rounded-lg bg-amber-950/20 border border-amber-500/20 flex flex-col justify-between hover:border-amber-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">Mature / At Risk</span>
+                            <span id="quadrantMatureCount" class="bg-amber-500 text-black text-xs font-extrabold px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <p class="text-3xs text-slate-400 mt-2 leading-snug">LQ &ge; 1.0 & Growth &lt; 0%</p>
+                    </div>
+
+                    <!-- Declining -->
+                    <div class="p-3.5 rounded-lg bg-rose-950/20 border border-rose-500/20 flex flex-col justify-between hover:border-rose-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold text-rose-400 uppercase tracking-wider">Declining</span>
+                            <span id="quadrantDecliningCount" class="bg-rose-500 text-black text-xs font-extrabold px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <p class="text-3xs text-slate-400 mt-2 leading-snug">LQ &lt; 1.0 & Growth &lt; 0%</p>
+                    </div>
+                </div>
+
+                <p class="text-3xs text-slate-500 mt-3 text-center italic">Calculated based on 2025 Location Quotient (LQ) and concentration % change</p>
+            </div>
+        </div>
+
+        <!-- Detailed Table Section -->
+        <div class="glass-card rounded-xl border border-slate-800/80 overflow-hidden shadow-2xl">
+            <div class="bg-slate-900/60 border-b border-slate-800/80 px-6 py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-white tracking-tight title-font">Comprehensive Clusters Analysis</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Sortable, searchable list of industry cluster metrics for the selected region</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="downloadCSV()" class="text-xs bg-[#CFB991] hover:bg-[#bfa57a] text-black font-extrabold px-4 py-2.5 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Export Regional Data (.CSV)
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-950 text-slate-400 border-b border-slate-800/80 font-bold text-2xs tracking-widest uppercase">
+                            <th onclick="handleSort('Cluster ID')" class="px-6 py-4 cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Cluster ID</span>
+                                    <span id="sort-icon-Cluster-ID"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('Cluster Name')" class="px-6 py-4 cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Cluster Name</span>
+                                    <span id="sort-icon-Cluster-Name"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('2025 Jobs')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>2025 Jobs</span>
+                                    <span id="sort-icon-2025-Jobs"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('Earnings Per Worker')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>Earnings / Worker</span>
+                                    <span id="sort-icon-Earnings-Per-Worker"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('Establishments')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>Establishments</span>
+                                    <span id="sort-icon-Establishments"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('2020 Employment Concentration')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>2020 LQ</span>
+                                    <span id="sort-icon-2020-Employment-Concentration"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('2025 Employment Concentration')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>2025 LQ</span>
+                                    <span id="sort-icon-2025-Employment-Concentration"></span>
+                                </div>
+                            </th>
+                            <th onclick="handleSort('Percent Change Employment Concentration')" class="px-6 py-4 text-right cursor-pointer select-none hover:bg-slate-900 transition duration-150">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>LQ % Change</span>
+                                    <span id="sort-icon-Percent-Change-Employment-Concentration"></span>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-800/65 text-slate-300">
+                        <!-- Table rows populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-black text-slate-500 py-8 px-6 text-center text-xs border-t-2 border-slate-900">
+        <div class="max-w-7xl mx-auto space-y-3">
+            <p class="font-semibold text-slate-400">INDIANA SBDC REGIONAL INDUSTRY CLUSTER INTELLIGENCE PLATFORM</p>
+            <p>Developed in collaboration with the Purdue University Center for Regional Development (PCRD).</p>
+            <p class="text-3xs text-slate-600">Disclaimer: Data modeling and projections for research purposes. Projections refer to EMSI / Lightcast industry cluster standards.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Data and Logic -->
+    <script>
+        const rawCSV = "Cluster ID,Cluster Name,2025 Jobs,Earnings Per Worker,Establishments,2020 Employment Concentration,2025 Employment Concentration,Percent Change Employment Concentration,SBDC Region\nIC01,\"Agribusiness, Food Processing and Technology\",19926.4276566,71025.8772193,644.75,0.488728,0.507013,0.0374134487895,Central Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",149617.17068,41992.9724775,7311.5,0.972126,0.954101,-0.0185418351119,Central Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",138059.473197,108144.799028,3059.5,1.046591,1.098164,0.0492771292702,Central Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",222829.94882,94818.7510744,14346.75,1.025137,0.988822,-0.0354245335014,Central Indiana\nIC03,Chemicals and Chemical-based Products,25864.7706779,252528.594223,264.75,1.815304,2.050483,0.129553507291,Central Indiana\nIC08,Defense and Security,42935.7064232,129787.930947,3586.0,0.950682,0.903911,-0.0491973130868,Central Indiana\nIC07,Education and Knowledge Creation,30569.1844867,58895.0530514,1656.75,0.662037,0.708835,0.0706878920665,Central Indiana\nIC04,Energy (Fossil and Renewable),51666.3399178,109060.305076,2843.0,0.818721,0.853739,0.0427715912991,Central Indiana\nIC05,Forest and Wood Products,35619.6575223,113317.446188,1803.5,0.963238,1.032684,0.0720964081567,Central Indiana\nIC06,Glass and Ceramics,2451.91691988,96015.3098155,65.5,1.177791,1.36478,0.15876246295,Central Indiana\nIC14,Apparel and Textiles,16400.2469909,70938.5213397,1421.25,0.905683,1.013705,0.119271312369,Central Indiana\nIC11,Information Technology and Telecommunications,56080.6374093,127365.256274,5025.0,0.902563,0.885507,-0.018897295812,Central Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),4010.95785096,150083.231959,194.5,0.935408,0.933741,-0.00178211005251,Central Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",32375.5461248,71384.2583715,2307.75,0.909366,0.891582,-0.0195564822085,Central Indiana\nIC12,Transportation and Logistics,131730.512279,59896.2046692,2516.75,1.531812,1.587276,0.036208098644,Central Indiana\nIC19,Computer and Electronic Product Manufacturing,3747.95090972,130901.091733,111.5,0.516288,0.558174,0.0811291372257,Central Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",677.605400498,115455.365795,39.5,0.380629,0.230791,-0.393658917213,Central Indiana\nIC17,Fabricated Metal Product Manufacturing,11943.7618917,99122.3346114,349.5,1.267972,1.240883,-0.0213640364298,Central Indiana\nIC18,Machinery Manufacturing,7055.94543163,97700.7037407,188.75,0.884731,0.960224,0.0853287609454,Central Indiana\nIC16,Primary Metal,2272.10213813,114882.307688,21.0,0.908767,0.959763,0.0561155939861,Central Indiana\nIC21,Transportation Equipment Manufacturing,27264.831373,136098.885308,1705.0,1.222956,1.069978,-0.125088719463,Central Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",14699.2968397,62054.9595121,368.25,1.865929,2.101423,0.12620737445,East Central Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",25535.5108141,25527.1353011,1308.0,0.933916,0.914923,-0.0203369467918,East Central Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",26771.1822004,67836.3268541,536.75,1.283993,1.196453,-0.0681779417801,East Central Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",19014.1698899,63165.8839747,1590.75,0.471509,0.474077,0.00544634354806,East Central Indiana\nIC03,Chemicals and Chemical-based Products,3666.85485681,84678.2823021,72.5,1.370006,1.633309,0.19219112909,East Central Indiana\nIC08,Defense and Security,2380.57051032,78106.8504373,280.75,0.333602,0.281589,-0.155913333853,East Central Indiana\nIC07,Education and Knowledge Creation,7488.48817969,33123.0290026,155.5,1.187462,0.975624,-0.178395603396,East Central Indiana\nIC04,Energy (Fossil and Renewable),5523.05603427,87488.7762531,470.0,0.484725,0.512771,0.0578596111197,East Central Indiana\nIC05,Forest and Wood Products,5222.5329529,71423.855924,280.5,0.917851,0.850718,-0.0731415011805,East Central Indiana\nIC06,Glass and Ceramics,1203.00975281,95345.2196925,22.0,3.955574,3.762295,-0.0488624406976,East Central Indiana\nIC14,Apparel and Textiles,1525.53547501,52971.6294028,113.25,0.405975,0.529798,0.305001539504,East Central Indiana\nIC11,Information Technology and Telecommunications,2996.0735636,84263.5348668,368.75,0.286886,0.265802,-0.0734926068194,East Central Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),741.296113571,88462.8458116,58.5,0.958609,0.96961,0.0114760032505,East Central Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",2986.23774956,46469.8521805,236.25,0.431663,0.462057,0.0704114089,East Central Indiana\nIC12,Transportation and Logistics,14413.8801755,52514.6107716,413.25,0.959236,0.97583,0.0172991839339,East Central Indiana\nIC19,Computer and Electronic Product Manufacturing,161.944609947,98171.5485061,9.5,0.170257,0.135509,-0.204091461731,East Central Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",437.743526573,108920.888818,5.0,1.076983,0.8377,-0.222178994469,East Central Indiana\nIC17,Fabricated Metal Product Manufacturing,3020.89069205,75145.6555931,140.25,1.613088,1.763403,0.0931846247694,East Central Indiana\nIC18,Machinery Manufacturing,3729.74551867,82511.8217375,77.25,2.575074,2.851829,0.107474581313,East Central Indiana\nIC16,Primary Metal,1947.59285099,91255.0119135,27.0,4.359102,4.622333,0.0603865199759,East Central Indiana\nIC21,Transportation Equipment Manufacturing,7171.73418873,82117.7840106,188.75,1.633309,1.581332,-0.0321034262833,East Central Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",20800.0070005,67713.7912655,600.75,2.688238,2.683713,-0.00168325869956,Hoosier Heartland\nIC02,\"Arts, Entertainment, Recreation and Visitor\",27517.7144585,25197.3947785,1390.75,0.876114,0.889832,0.0156577796953,Hoosier Heartland\nIC09,\"Biomedical, Biotechnical and Healthcare\",21239.4383673,65451.3404408,498.75,0.899481,0.856696,-0.0475663187994,Hoosier Heartland\nIC10,\"Business, Financial Technology and Specialized Services\",20990.3410565,64371.8788079,1816.75,0.44602,0.472331,0.0589906282229,Hoosier Heartland\nIC03,Chemicals and Chemical-based Products,3481.09293603,102153.551621,69.5,1.174805,1.399413,0.191187473666,Hoosier Heartland\nIC08,Defense and Security,4653.93009475,96233.9085953,446.0,0.411531,0.496832,0.207277216054,Hoosier Heartland\nIC07,Education and Knowledge Creation,4685.80327111,48839.5067502,239.75,0.510925,0.55097,0.0783774526594,Hoosier Heartland\nIC04,Energy (Fossil and Renewable),9672.58143839,97871.2964781,588.25,0.74552,0.81048,0.0871338126408,Hoosier Heartland\nIC05,Forest and Wood Products,7932.77508392,79835.5941754,298.75,1.126617,1.166233,0.0351636802924,Hoosier Heartland\nIC06,Glass and Ceramics,721.850022998,73493.4317857,18.0,1.156527,2.037448,0.761695144169,Hoosier Heartland\nIC14,Apparel and Textiles,1285.05013613,46175.0905305,114.0,0.486623,0.402776,-0.172303816301,Hoosier Heartland\nIC11,Information Technology and Telecommunications,6383.85810943,96016.0377156,626.75,0.426304,0.511146,0.199017602462,Hoosier Heartland\nIC13,Mining and Quarrying (Except Fossil Fuels),1475.55247781,88062.8430147,48.5,1.111858,1.74187,0.566629911374,Hoosier Heartland\nIC15,\"Printed Products, Media Creation and Distribution\",4349.44321664,52525.3234323,254.0,0.577455,0.60738,0.0518222199132,Hoosier Heartland\nIC12,Transportation and Logistics,12174.8976091,50335.7855776,533.0,0.706612,0.743899,0.0527687047489,Hoosier Heartland\nIC19,Computer and Electronic Product Manufacturing,808.908593449,92373.0297111,25.5,0.520285,0.610883,0.174131485628,Hoosier Heartland\nIC20,\"Electrical Equipment, Appliance and Component\",1652.56030096,92359.0328024,16.25,2.460599,2.854185,0.159955360463,Hoosier Heartland\nIC17,Fabricated Metal Product Manufacturing,4346.06161157,75533.1939635,120.0,2.23059,2.289646,0.0264755064803,Hoosier Heartland\nIC18,Machinery Manufacturing,4488.08086057,117166.567299,44.25,2.315687,3.09714,0.337460546266,Hoosier Heartland\nIC16,Primary Metal,3511.39690017,125137.912983,14.0,7.954989,7.521402,-0.0545050407989,Hoosier Heartland\nIC21,Transportation Equipment Manufacturing,20326.9489695,110777.049687,227.25,4.492557,4.045576,-0.0996049688407,Hoosier Heartland\nIC01,\"Agribusiness, Food Processing and Technology\",11611.2749771,61026.975545,386.75,0.953535,1.024362,0.0742783432176,North Central Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",35592.5742387,31068.2121632,1821.75,0.781783,0.786966,0.00662991694191,North Central Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",37321.4385195,78761.1666164,616.25,1.081145,1.029302,-0.0479519398416,North Central Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",34788.0047644,73277.1996009,2453.0,0.508089,0.535251,0.0534591380644,North Central Indiana\nIC03,Chemicals and Chemical-based Products,11548.0477512,77788.0835909,236.0,3.327843,3.17424,-0.0461569250713,North Central Indiana\nIC08,Defense and Security,13090.7689992,116665.70764,542.75,1.047973,0.955555,-0.0881873865071,North Central Indiana\nIC07,Education and Knowledge Creation,22050.9001165,57318.1682428,268.25,1.7011,1.772847,0.0421768267592,North Central Indiana\nIC04,Energy (Fossil and Renewable),10500.9104819,101676.118271,682.0,0.53081,0.601628,0.133414969575,North Central Indiana\nIC05,Forest and Wood Products,17512.5310146,79384.9010399,624.75,1.902825,1.760394,-0.0748523905246,North Central Indiana\nIC06,Glass and Ceramics,2619.00169076,81296.6084966,62.25,4.31247,5.054476,0.172060559262,North Central Indiana\nIC14,Apparel and Textiles,3399.91741699,59135.8163064,271.5,0.777983,0.72864,-0.0634242650546,North Central Indiana\nIC11,Information Technology and Telecommunications,9198.86410449,96997.4740014,809.0,0.40162,0.503613,0.253953986355,North Central Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),1486.98042357,95186.0766054,65.75,1.058936,1.200237,0.133436770494,North Central Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",7394.54372829,70877.6040024,450.0,0.685289,0.706056,0.0303040031286,North Central Indiana\nIC12,Transportation and Logistics,19059.835083,51214.4114515,681.25,0.77109,0.796286,0.0326758225369,North Central Indiana\nIC19,Computer and Electronic Product Manufacturing,977.500735087,76809.5055323,33.5,0.473699,0.50475,0.0655500644924,North Central Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",1180.11610345,92026.2294849,31.75,1.248632,1.393639,0.116132695622,North Central Indiana\nIC17,Fabricated Metal Product Manufacturing,11554.4601956,77922.8382818,302.5,4.111573,4.1622,0.0123132922607,North Central Indiana\nIC18,Machinery Manufacturing,3845.73238237,88193.7418885,122.25,1.820448,1.814596,-0.00321459333087,North Central Indiana\nIC16,Primary Metal,3283.67832642,91214.573375,44.0,4.217323,4.809283,0.140363922801,Northwest Indiana\nIC21,Transportation Equipment Manufacturing,41796.686715,93638.9163828,566.75,5.660657,5.687184,0.00468620515251,North Central Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",19316.4864256,58956.1630245,558.75,1.507923,1.5432,0.0233944306175,Northeast Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",41204.5528919,28926.9140988,2183.0,0.851542,0.825016,-0.0311505480646,Northeast Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",43971.5142964,79357.3169873,687.75,1.0994,1.098188,-0.00110241950155,Northeast Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",45172.2645485,78455.1132251,3294.75,0.621338,0.629391,0.0129607395653,Northeast Indiana\nIC03,Chemicals and Chemical-based Products,10081.7496211,83159.516023,154.5,2.204915,2.509503,0.138140472535,Northeast Indiana\nIC08,Defense and Security,8518.42608111,95557.8895356,626.25,0.479324,0.563081,0.174739841944,Northeast Indiana\nIC07,Education and Knowledge Creation,8300.25098949,39184.5146949,300.75,0.651939,0.604306,-0.0730635841697,Northeast Indiana\nIC04,Energy (Fossil and Renewable),14637.8304946,99676.3313345,877.0,0.727087,0.759449,0.0445091165156,Northeast Indiana\nIC05,Forest and Wood Products,15729.0746347,82325.191637,670.75,1.35664,1.431808,0.0554074772969,Northeast Indiana\nIC06,Glass and Ceramics,2660.49096585,75118.7792956,54.25,3.90765,4.649677,0.189890855118,Northeast Indiana\nIC14,Apparel and Textiles,4071.18970212,63822.8595684,304.5,0.832714,0.790108,-0.051165225996,Northeast Indiana\nIC11,Information Technology and Telecommunications,11239.576855,100365.854073,953.25,0.567955,0.557229,-0.0188852990114,Northeast Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),1715.31494204,94581.3583069,107.75,1.199233,1.253795,0.0454974137636,Northeast Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",8033.61572058,63818.9127695,521.5,0.742183,0.694639,-0.0640596726144,Northeast Indiana\nIC12,Transportation and Logistics,26245.5998263,54457.9973175,856.25,0.91718,0.992949,0.0826108288449,Northeast Indiana\nIC19,Computer and Electronic Product Manufacturing,3516.25313339,103270.802882,49.5,1.54204,1.644222,0.0662641695416,Northeast Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",1943.67131269,85801.8509163,35.5,2.736204,2.078591,-0.240337708738,Northeast Indiana\nIC17,Fabricated Metal Product Manufacturing,12922.4225929,85277.6125889,295.5,4.064614,4.215391,0.0370950353465,Northeast Indiana\nIC18,Machinery Manufacturing,5878.99460858,84420.3371924,164.5,2.450588,2.512029,0.0250719419176,Northeast Indiana\nIC16,Primary Metal,6405.19114725,117675.23736,54.75,7.565739,8.495178,0.122848409124,Northeast Indiana\nIC21,Transportation Equipment Manufacturing,23424.7224437,95087.5558056,445.25,2.945116,2.88636,-0.0199503177464,Northeast Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",13559.2420627,67343.956557,424.75,1.00258,1.117346,0.114470665683,Northwest Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",50969.4735621,30167.0461757,2589.5,1.105601,1.052653,-0.0478906947443,Northwest Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",36765.7338174,63762.4880672,831.75,1.045852,0.947124,-0.0943995899993,Northwest Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",46386.8470784,65905.7294041,3802.75,0.587409,0.666656,0.134909407244,Northwest Indiana\nIC03,Chemicals and Chemical-based Products,4933.89735214,106432.831602,140.0,1.294509,1.266777,-0.0214227942795,Northwest Indiana\nIC08,Defense and Security,4596.47558093,79157.1068376,660.25,0.273814,0.313397,0.144561636732,Northwest Indiana\nIC07,Education and Knowledge Creation,6343.91495392,38935.602004,365.5,0.472004,0.47641,0.00933466665537,Northwest Indiana\nIC04,Energy (Fossil and Renewable),17661.6500316,127543.180587,1026.25,0.916806,0.945172,0.030940024389,Northwest Indiana\nIC05,Forest and Wood Products,8958.92930319,96078.8482555,554.0,0.784605,0.841194,0.072124189879,Northwest Indiana\nIC06,Glass and Ceramics,1533.00657303,98174.7548409,47.5,2.630991,2.763524,0.0503737945132,Northwest Indiana\nIC14,Apparel and Textiles,3728.24388324,58531.4632018,345.0,0.586799,0.746324,0.271856291507,Northwest Indiana\nIC11,Information Technology and Telecommunications,8756.68191392,95070.2040076,1068.5,0.358426,0.447797,0.249342960611,Northwest Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),2362.68306938,99865.1583571,161.25,1.719894,1.781337,0.0357248760679,Northwest Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",7075.80369245,53936.5961676,562.5,0.549293,0.631077,0.148889572596,Northwest Indiana\nIC12,Transportation and Logistics,29251.3295625,55563.0173512,1126.75,1.084515,1.141495,0.052539614482,Northwest Indiana\nIC19,Computer and Electronic Product Manufacturing,563.106131315,96115.5926897,20.5,0.256152,0.271599,0.0603040382273,Northwest Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",547.292245145,82556.4957068,16.0,0.436043,0.603704,0.384505656552,Northwest Indiana\nIC17,Fabricated Metal Product Manufacturing,4820.33539322,88456.3349741,187.5,1.602805,1.62192,0.0119259672886,Northwest Indiana\nIC18,Machinery Manufacturing,4872.22716216,92497.3825508,93.75,1.913386,2.147372,0.122889968352,Northwest Indiana\nIC16,Primary Metal,15689.479669,152876.10062,36.75,21.75739,21.463822,-0.0134931575917,Northwest Indiana\nIC21,Transportation Equipment Manufacturing,4743.44114156,86575.8917663,329.75,0.603578,0.602876,-0.00116306426013,Northwest Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",10724.8701993,56207.6458819,275.5,1.772398,1.750444,-0.0123866084254,South Central Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",23423.6851707,26902.9043537,1124.5,0.947738,0.958152,0.0109882689098,South Central Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",22889.0089556,70050.6745144,366.75,1.158873,1.167869,0.00776271429225,South Central Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",19440.1010282,70191.229428,1514.5,0.539795,0.553362,0.0251336155392,South Central Indiana\nIC03,Chemicals and Chemical-based Products,6627.62478594,97628.4695878,75.5,2.775092,3.370325,0.214491267317,South Central Indiana\nIC08,Defense and Security,3902.0969855,88497.9184907,377.5,0.494691,0.526952,0.0652144469982,South Central Indiana\nIC07,Education and Knowledge Creation,3628.42474156,33049.9070156,195.0,0.487023,0.539692,0.108144789876,South Central Indiana\nIC04,Energy (Fossil and Renewable),8493.30578081,88397.9199746,479.5,0.821435,0.900244,0.0959406404646,South Central Indiana\nIC05,Forest and Wood Products,13308.9139922,74868.0655284,439.75,2.592989,2.475064,-0.045478403495,South Central Indiana\nIC06,Glass and Ceramics,312.648029253,92530.1101431,11.5,0.519344,1.116294,1.14943082042,South Central Indiana\nIC14,Apparel and Textiles,1900.31825032,58581.2608973,105.75,0.833887,0.753449,-0.0964615109721,South Central Indiana\nIC11,Information Technology and Telecommunications,6438.27562325,91046.4216899,499.75,0.572423,0.652101,0.139194267177,South Central Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),1205.37409328,86064.4416428,56.0,2.033104,1.799975,-0.114666539439,South Central Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",3122.43741378,53744.5870074,240.75,0.553921,0.551574,-0.00423706629646,South Central Indiana\nIC12,Transportation and Logistics,9700.93940176,46403.3921547,336.0,0.747029,0.749801,0.00371069931689,South Central Indiana\nIC19,Computer and Electronic Product Manufacturing,737.183881879,88764.7584784,14.75,0.637252,0.704236,0.105113832518,South Central Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",144.094635926,73884.4189905,2.0,0.480195,0.314816,-0.344399670967,South Central Indiana\nIC17,Fabricated Metal Product Manufacturing,793.576608823,63334.6288308,58.75,0.580874,0.528865,-0.0895357685143,South Central Indiana\nIC18,Machinery Manufacturing,1001.96902154,79750.0985037,26.25,0.785179,0.874657,0.113958727882,South Central Indiana\nIC16,Primary Metal,997.526578919,124820.080561,5.5,2.831703,2.702881,-0.0454927653077,South Central Indiana\nIC21,Transportation Equipment Manufacturing,4133.46125985,79037.9366574,185.75,1.086212,1.040524,-0.0420617706304,South Central Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",14305.1530035,56229.7717713,334.75,1.519265,1.554553,0.0232270209608,Southeast Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",33753.4170932,29005.7501538,1592.0,0.955727,0.919292,-0.0381228112212,Southeast Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",25351.5114717,65183.4867691,679.25,0.776737,0.861248,0.108802593413,Southeast Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",27927.6188337,67815.3124715,2454.5,0.514823,0.529299,0.0281184018585,Southeast Indiana\nIC03,Chemicals and Chemical-based Products,6485.65003788,84757.1019509,131.75,2.311426,2.195959,-0.0499548763404,Southeast Indiana\nIC08,Defense and Security,3920.57607264,83786.2937725,488.75,0.40221,0.352517,-0.123549886875,Southeast Indiana\nIC07,Education and Knowledge Creation,3667.55983813,35687.1590547,229.0,0.335385,0.363213,0.0829732993425,Southeast Indiana\nIC04,Energy (Fossil and Renewable),8131.91316394,88948.1432198,682.75,0.541376,0.573896,0.0600691571108,Southeast Indiana\nIC05,Forest and Wood Products,9420.06699962,77706.4098641,488.25,1.202915,1.166419,-0.0303396333074,Southeast Indiana\nIC06,Glass and Ceramics,983.249770937,87900.1109772,26.5,2.58966,2.337458,-0.0973880741101,Southeast Indiana\nIC14,Apparel and Textiles,2171.15421531,52050.8479482,182.25,0.435269,0.573159,0.316792604114,Southeast Indiana\nIC11,Information Technology and Telecommunications,6648.4112974,96873.8401706,708.25,0.443493,0.448353,0.0109584593218,Southeast Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),2585.78030783,119312.097199,83.75,2.459265,2.570947,0.0454127554371,Southeast Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",4841.41695896,53224.6404421,340.5,0.530632,0.569429,0.0731147009604,Southeast Indiana\nIC12,Transportation and Logistics,26895.0851936,60388.1758693,672.5,1.369312,1.384083,0.0107871690309,Southeast Indiana\nIC19,Computer and Electronic Product Manufacturing,1713.99700713,108909.33246,15.5,0.934852,1.090208,0.166182454549,Southeast Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",1250.89374386,108481.103975,9.75,2.354784,1.819641,-0.227257786701,Southeast Indiana\nIC17,Fabricated Metal Product Manufacturing,4450.06637511,74796.4365233,184.75,2.125926,1.974601,-0.0711807466488,Southeast Indiana\nIC18,Machinery Manufacturing,13507.8963917,147523.363479,96.75,7.65639,7.851059,0.0254256901751,Southeast Indiana\nIC16,Primary Metal,2746.65384937,95364.1533821,21.25,4.519483,4.955223,0.0964136827155,Southeast Indiana\nIC21,Transportation Equipment Manufacturing,15879.4982199,96274.2979087,278.5,2.905458,2.661532,-0.0839544058114,Southeast Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",9431.8025211,69699.9194108,321.75,1.417783,1.40598,-0.00832496933593,Southwest Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",24499.5937101,28604.8269264,1190.0,0.916766,0.915306,-0.00159255469771,Southwest Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",22095.5244233,74243.5250429,437.0,1.057868,1.029674,-0.0266517183618,Southwest Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",21823.6442418,78479.9372163,1650.5,0.529295,0.56737,0.0720426572343,Southwest Indiana\nIC03,Chemicals and Chemical-based Products,8664.26412874,96506.6193623,99.75,3.570411,4.024145,0.127081728126,Southwest Indiana\nIC08,Defense and Security,3597.19168165,96134.4225932,283.0,0.395534,0.443675,0.121711407869,Southwest Indiana\nIC07,Education and Knowledge Creation,4067.32023259,40856.5551024,176.25,0.561922,0.55254,-0.0166962674535,Southwest Indiana\nIC04,Energy (Fossil and Renewable),13131.2121573,103447.889204,604.5,1.412758,1.271208,-0.100194088443,Southwest Indiana\nIC05,Forest and Wood Products,5646.93007981,93249.8461038,328.25,0.942484,0.959145,0.0176777536807,Southwest Indiana\nIC06,Glass and Ceramics,496.663038369,66909.1053363,14.0,2.642012,1.61962,-0.386974775285,Southwest Indiana\nIC14,Apparel and Textiles,1477.42782698,63971.7838956,130.75,0.55608,0.53501,-0.0378902316213,Southwest Indiana\nIC11,Information Technology and Telecommunications,6169.40200933,103425.750543,460.0,0.506346,0.570712,0.127118610594,Southwest Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),1119.35118119,85293.2732127,51.0,1.334506,1.526649,0.143980619046,Southwest Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",4162.65283787,68186.7035124,246.5,0.578362,0.671597,0.161205265906,Southwest Indiana\nIC12,Transportation and Logistics,13323.5436452,54522.5952107,386.5,0.933785,0.940547,0.00724149563336,Southwest Indiana\nIC19,Computer and Electronic Product Manufacturing,186.579408106,93743.6517897,6.0,0.205679,0.162792,-0.208514238206,Southwest Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",726.940449057,90974.0772323,5.25,1.597842,1.450559,-0.0921761976466,Southwest Indiana\nIC17,Fabricated Metal Product Manufacturing,2525.47480753,83623.6426847,88.25,1.35912,1.537188,0.130524699348,Southwest Indiana\nIC18,Machinery Manufacturing,987.197157637,94424.5470999,40.0,0.882313,0.787074,-0.107942419527,Southwest Indiana\nIC16,Primary Metal,2878.93162719,122111.67369,9.25,5.300213,7.124623,0.344214468362,Southwest Indiana\nIC21,Transportation Equipment Manufacturing,13396.5768732,110749.498772,150.75,3.038336,3.080066,0.0137344915111,Southwest Indiana\nIC01,\"Agribusiness, Food Processing and Technology\",5322.74414948,47058.8273874,168.25,1.512785,1.640178,0.0842109090188,West Central Indiana\nIC02,\"Arts, Entertainment, Recreation and Visitor\",11682.6282681,26066.9120033,613.5,0.931509,0.902233,-0.0314285744958,West Central Indiana\nIC09,\"Biomedical, Biotechnical and Healthcare\",12866.7220074,77065.4403069,243.0,1.280212,1.239465,-0.0318283221841,West Central Indiana\nIC10,\"Business, Financial Technology and Specialized Services\",8259.43346609,65671.9151841,708.0,0.408973,0.443874,0.0853381519073,West Central Indiana\nIC03,Chemicals and Chemical-based Products,4166.16312089,93081.2651837,46.75,3.364787,3.999902,0.188753404004,West Central Indiana\nIC08,Defense and Security,1828.3466787,96039.7245854,117.75,0.365464,0.466156,0.275518245299,West Central Indiana\nIC07,Education and Knowledge Creation,3063.75251793,51265.040445,68.25,1.066682,0.86036,-0.193424094529,West Central Indiana\nIC04,Energy (Fossil and Renewable),4661.51867075,101778.65889,241.0,0.808399,0.932847,0.153943782711,West Central Indiana\nIC05,Forest and Wood Products,3898.13459277,79843.3430252,156.0,1.479626,1.368673,-0.0749871927095,West Central Indiana\nIC06,Glass and Ceramics,241.88294797,83693.285017,6.75,1.360646,1.630525,0.198346267119,West Central Indiana\nIC14,Apparel and Textiles,465.017903073,51879.5150473,45.0,0.331221,0.348094,0.0509418183026,West Central Indiana\nIC11,Information Technology and Telecommunications,1474.86448208,85304.9944988,167.75,0.242503,0.282031,0.16300004536,West Central Indiana\nIC13,Mining and Quarrying (Except Fossil Fuels),316.143776922,95770.5749776,23.5,1.012455,0.891309,-0.119655688401,West Central Indiana\nIC15,\"Printed Products, Media Creation and Distribution\",1598.95450214,56957.2720639,108.75,0.528297,0.533268,0.00940947989483,West Central Indiana\nIC12,Transportation and Logistics,6837.1293758,51520.0243692,240.0,0.961726,0.997712,0.0374181419656,West Central Indiana\nIC19,Computer and Electronic Product Manufacturing,268.973536121,87452.4685663,3.0,0.367333,0.485122,0.320660000599,West Central Indiana\nIC20,\"Electrical Equipment, Appliance and Component\",10.5084720414,39472.503548,0.5,0.034694,0.043346,0.249380296305,West Central Indiana\nIC17,Fabricated Metal Product Manufacturing,1174.65220358,68759.8153102,40.0,1.289476,1.477966,0.146175655848,West Central Indiana\nIC18,Machinery Manufacturing,788.246898455,83231.9367087,16.5,1.313513,1.299108,-0.0109667738347,West Central Indiana\nIC16,Primary Metal,936.690586113,120242.220453,5.0,2.976933,4.79179,0.609639854172,West Central Indiana\nIC21,Transportation Equipment Manufacturing,3009.20443893,76350.9092146,71.75,1.821101,1.430174,-0.214665194297,West Central Indiana";
+        
+        let allData = [];
+        let sortedColumn = '2025 Jobs'; // Sort by Jobs desc initially to show largest clusters
+        let sortAscending = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Parse CSV with PapaParse
+            const parsed = Papa.parse(rawCSV, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true
+            });
+            allData = parsed.data;
+
+            // Populate Region Selector Dropdown
+            const regions = [...new Set(allData.map(item => item['SBDC Region']))].filter(Boolean).sort();
+            const select = document.getElementById('regionSelect');
+            
+            // Add "All Regions (Statewide)" option
+            const allOption = document.createElement('option');
+            allOption.value = 'All Regions';
+            allOption.textContent = 'All Regions (Statewide)';
+            select.appendChild(allOption);
+
+            regions.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = region;
+                if (region === 'Central Indiana') {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            // Initial dashboard update
+            updateDashboard();
+        });
+
+        function resetFilters() {
+            document.getElementById('searchQuery').value = '';
+            document.getElementById('regionSelect').value = 'Central Indiana';
+            sortedColumn = '2025 Jobs';
+            sortAscending = false;
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            const selectedRegion = document.getElementById('regionSelect').value;
+            const searchQuery = document.getElementById('searchQuery').value.toLowerCase();
+
+            // 1. Filter Data by selected Region
+            let regionData = [];
+            if (selectedRegion === 'All Regions') {
+                // Aggregate/Average across all regions statewide
+                const clusterMap = {};
+                allData.forEach(row => {
+                    const id = row['Cluster ID'];
+                    if (!id) return;
+                    if (!clusterMap[id]) {
+                        clusterMap[id] = {
+                            'Cluster ID': id,
+                            'Cluster Name': row['Cluster Name'],
+                            '2025 Jobs': 0,
+                            'Earnings Per Worker': 0,
+                            'Establishments': 0,
+                            '2020 Employment Concentration': 0,
+                            '2025 Employment Concentration': 0,
+                            'Percent Change Employment Concentration': 0,
+                            'SBDC Region': 'All Regions',
+                            '_earnings_weighted': 0,
+                            'count': 0
+                        };
+                    }
+                    clusterMap[id]['2025 Jobs'] += row['2025 Jobs'] || 0;
+                    clusterMap[id]['Establishments'] += row['Establishments'] || 0;
+                    clusterMap[id]['_earnings_weighted'] += (row['Earnings Per Worker'] || 0) * (row['2025 Jobs'] || 0);
+                    clusterMap[id]['2020 Employment Concentration'] += row['2020 Employment Concentration'] || 0;
+                    clusterMap[id]['2025 Employment Concentration'] += row['2025 Employment Concentration'] || 0;
+                    clusterMap[id]['Percent Change Employment Concentration'] += row['Percent Change Employment Concentration'] || 0;
+                    clusterMap[id]['count'] += 1;
+                });
+
+                regionData = Object.values(clusterMap).map(row => {
+                    row['Earnings Per Worker'] = row['2025 Jobs'] > 0 ? (row['_earnings_weighted'] / row['2025 Jobs']) : 0;
+                    row['2020 Employment Concentration'] /= row['count'];
+                    row['2025 Employment Concentration'] /= row['count'];
+                    row['Percent Change Employment Concentration'] /= row['count'];
+                    return row;
+                });
+            } else {
+                regionData = allData.filter(row => row['SBDC Region'] === selectedRegion);
+            }
+
+            // 2. Filter by search input
+            const filteredData = regionData.filter(row => {
+                const idMatch = row['Cluster ID'] ? row['Cluster ID'].toLowerCase().includes(searchQuery) : false;
+                const nameMatch = row['Cluster Name'] ? row['Cluster Name'].toLowerCase().includes(searchQuery) : false;
+                return idMatch || nameMatch;
+            });
+
+            // 3. Compute High-Performance KPIs
+            let totalJobs = 0;
+            let totalEst = 0;
+            let totalWeightedEarnings = 0;
+            let specializedCount = 0;
+
+            filteredData.forEach(row => {
+                totalJobs += row['2025 Jobs'] || 0;
+                totalEst += row['Establishments'] || 0;
+                totalWeightedEarnings += (row['Earnings Per Worker'] || 0) * (row['2025 Jobs'] || 0);
+                if (row['2025 Employment Concentration'] >= 1.0) {
+                    specializedCount++;
+                }
+            });
+
+            const avgEarnings = totalJobs > 0 ? (totalWeightedEarnings / totalJobs) : 0;
+            const avgSize = totalEst > 0 ? (totalJobs / totalEst) : 0;
+
+            // Update KPI elements in layout
+            document.getElementById('kpiJobs').textContent = Math.round(totalJobs).toLocaleString();
+            document.getElementById('kpiJobsTrend').textContent = selectedRegion === 'All Regions' ? 'Statewide Total' : 'Regional Target';
+            document.getElementById('kpiEst').textContent = Math.round(totalEst).toLocaleString();
+            document.getElementById('kpiAvgSize').textContent = avgSize.toFixed(1);
+            document.getElementById('kpiEarnings').textContent = '$' + Math.round(avgEarnings).toLocaleString();
+            document.getElementById('kpiSpecialized').textContent = specializedCount + ' / ' + filteredData.length;
+
+            // 4. Update Performance Matrix Quadrant Counts
+            let champions = 0;
+            let emerging = 0;
+            let mature = 0;
+            let declining = 0;
+
+            filteredData.forEach(row => {
+                const lq2025 = row['2025 Employment Concentration'] || 0;
+                const pctChange = row['Percent Change Employment Concentration'] || 0;
+                if (lq2025 >= 1.0 && pctChange >= 0) champions++;
+                else if (lq2025 < 1.0 && pctChange >= 0) emerging++;
+                else if (lq2025 >= 1.0 && pctChange < 0) mature++;
+                else if (lq2025 < 1.0 && pctChange < 0) declining++;
+            });
+
+            document.getElementById('quadrantChampionsCount').textContent = champions;
+            document.getElementById('quadrantEmergingCount').textContent = emerging;
+            document.getElementById('quadrantMatureCount').textContent = mature;
+            document.getElementById('quadrantDecliningCount').textContent = declining;
+
+            // 5. Update Table Sort Icons and Body
+            updateSortIcons();
+            updateTable(filteredData);
+
+            // 6. Update Visual Interactive Charts
+            renderJobsChart(filteredData);
+            renderBubbleChart(filteredData);
+            renderTrendChart(filteredData);
+        }
+
+        function updateTable(data) {
+            // Sort data according to active state
+            const sorted = [...data].sort((a, b) => {
+                let valA = a[sortedColumn];
+                let valB = b[sortedColumn];
+                
+                // Keep null values grouped nicely
+                if (valA === undefined || valA === null) valA = '';
+                if (valB === undefined || valB === null) valB = '';
+
+                if (typeof valA === 'string') {
+                    return sortAscending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return sortAscending ? valA - valB : valB - valA;
+                }
+            });
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            sorted.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/60 border-b border-slate-800/40 transition duration-150";
+
+                const lq2025 = row['2025 Employment Concentration'] || 0;
+                const lq2020 = row['2020 Employment Concentration'] || 0;
+                const lqChange = row['Percent Change Employment Concentration'] || 0;
+
+                const lqBadge = lq2025 >= 1.0 
+                    ? `<span class="bg-emerald-950/40 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded border border-emerald-500/20">${lq2025.toFixed(2)}</span>`
+                    : `<span class="bg-slate-950 text-slate-400 text-xs px-2 py-0.5 rounded border border-slate-800">${lq2025.toFixed(2)}</span>`;
+
+                const changeClass = lqChange >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400';
+                const changeSign = lqChange >= 0 ? '+' : '';
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-mono text-xs text-slate-500 font-bold">${row['Cluster ID'] || ''}</td>
+                    <td class="px-6 py-4 font-semibold text-white text-xs">${row['Cluster Name'] || ''}</td>
+                    <td class="px-6 py-4 text-right font-mono text-xs">${Math.round(row['2025 Jobs'] || 0).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-mono text-xs text-emerald-400">$${Math.round(row['Earnings Per Worker'] || 0).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-mono text-xs">${Math.round(row['Establishments'] || 0).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-mono text-xs">${lq2020.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-right">${lqBadge}</td>
+                    <td class="px-6 py-4 text-right font-mono text-xs ${changeClass}">${changeSign}${(lqChange * 100).toFixed(1)}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleSort(colName) {
+            if (sortedColumn === colName) {
+                sortAscending = !sortAscending;
+            } else {
+                sortedColumn = colName;
+                sortAscending = true;
+            }
+            updateDashboard();
+        }
+
+        function updateSortIcons() {
+            const columns = [
+                'Cluster ID', 'Cluster Name', '2025 Jobs', 'Earnings Per Worker', 
+                'Establishments', '2020 Employment Concentration', '2025 Employment Concentration', 
+                'Percent Change Employment Concentration'
+            ];
+            columns.forEach(col => {
+                const id = 'sort-icon-' + col.replace(/\s+/g, '-');
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (sortedColumn === col) {
+                    el.innerHTML = sortAscending 
+                        ? `<svg class="w-3 h-3 text-[#CFB991]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>`
+                        : `<svg class="w-3 h-3 text-[#CFB991]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
+                } else {
+                    el.innerHTML = `<svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"></path></svg>`;
+                }
+            });
+        }
+
+        // Jobs Chart Configuration
+        let jobsChart = null;
+        function renderJobsChart(data) {
+            const ctx = document.getElementById('jobsChart').getContext('2d');
+            
+            // Sort data by jobs descending and display top 10
+            const sortedData = [...data].sort((a, b) => b['2025 Jobs'] - a['2025 Jobs']).slice(0, 10);
+            
+            const labels = sortedData.map(row => row['Cluster Name'].length > 30 ? row['Cluster Name'].substring(0, 30) + '...' : row['Cluster Name']);
+            const jobs = sortedData.map(row => row['2025 Jobs']);
+
+            if (jobsChart) {
+                jobsChart.destroy();
+            }
+
+            jobsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Projected Jobs',
+                        data: jobs,
+                        backgroundColor: 'rgba(207, 185, 145, 0.85)', 
+                        borderColor: '#CFB991',
+                        borderWidth: 1.5,
+                        borderRadius: 4,
+                        hoverBackgroundColor: 'rgba(207, 185, 145, 1)'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#CFB991',
+                            bodyColor: '#f1f5f9',
+                            borderColor: 'rgba(207, 185, 145, 0.3)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Jobs: ${Math.round(context.parsed.x).toLocaleString()}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#1e293b' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#f1f5f9', font: { family: 'Inter', size: 10, weight: '600' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Specialization vs Earnings Bubble Chart
+        let bubbleChart = null;
+        function renderBubbleChart(data) {
+            const ctx = document.getElementById('bubbleChart').getContext('2d');
+            
+            const maxJobs = Math.max(...allData.map(row => row['2025 Jobs'] || 0));
+            
+            const bubblePoints = data.map(row => {
+                const jobs = row['2025 Jobs'] || 0;
+                const r = 5 + Math.sqrt(jobs / maxJobs) * 22; // proportional bubble size
+                return {
+                    x: row['2025 Employment Concentration'] || 0,
+                    y: row['Earnings Per Worker'] || 0,
+                    r: r,
+                    name: row['Cluster Name'],
+                    jobs: jobs
+                };
+            });
+
+            if (bubbleChart) {
+                bubbleChart.destroy();
+            }
+
+            bubbleChart = new Chart(ctx, {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: 'Industry Clusters',
+                        data: bubblePoints,
+                        backgroundColor: 'rgba(207, 185, 145, 0.4)',
+                        borderColor: '#CFB991',
+                        borderWidth: 1.5,
+                        hoverBackgroundColor: 'rgba(207, 185, 145, 0.8)',
+                        hoverBorderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#CFB991',
+                            bodyColor: '#f1f5f9',
+                            borderColor: 'rgba(207, 185, 145, 0.3)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const raw = context.raw;
+                                    return [
+                                        `Cluster: ${raw.name}`,
+                                        `Location Quotient (LQ): ${raw.x.toFixed(2)}`,
+                                        `Avg Earnings: $${Math.round(raw.y).toLocaleString()}`,
+                                        `Total Jobs: ${Math.round(raw.jobs).toLocaleString()}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Location Quotient (LQ)',
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 10, weight: 'bold' }
+                            },
+                            grid: { color: '#1e293b' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Average Earnings Per Worker ($)',
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 10, weight: 'bold' }
+                            },
+                            grid: { color: '#1e293b' },
+                            ticks: { 
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 10 },
+                                callback: function(value) {
+                                    return '$' + (value / 1000) + 'k';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 2020 vs 2025 Trend Grouped Bar Chart
+        let trendChart = null;
+        function renderTrendChart(data) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            // Show top 10 clusters ranked by 2025 LQ to see key specializations
+            const sortedData = [...data].sort((a, b) => b['2025 Employment Concentration'] - a['2025 Employment Concentration']).slice(0, 10);
+            
+            const labels = sortedData.map(row => row['Cluster ID'] + ' - ' + (row['Cluster Name'].length > 20 ? row['Cluster Name'].substring(0, 20) + '...' : row['Cluster Name']));
+            const lq2020 = sortedData.map(row => row['2020 Employment Concentration'] || 0);
+            const lq2025 = sortedData.map(row => row['2025 Employment Concentration'] || 0);
+
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '2020 LQ',
+                            data: lq2020,
+                            backgroundColor: '#1e293b', 
+                            borderColor: '#334155',
+                            borderWidth: 1.5,
+                            borderRadius: 3
+                        },
+                        {
+                            label: '2025 LQ',
+                            data: lq2025,
+                            backgroundColor: '#CFB991', 
+                            borderColor: '#bfa57a',
+                            borderWidth: 1.5,
+                            borderRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#f1f5f9', font: { family: 'Inter', size: 10, weight: 'bold' } }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#CFB991',
+                            bodyColor: '#f1f5f9',
+                            borderColor: 'rgba(207, 185, 145, 0.3)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { 
+                                color: '#94a3b8', 
+                                font: { family: 'Inter', size: 9 },
+                                maxRotation: 35,
+                                minRotation: 35
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Location Quotient (LQ)',
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 10, weight: 'bold' }
+                            },
+                            grid: { color: '#1e293b' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function downloadCSV() {
+            const selectedRegion = document.getElementById('regionSelect').value;
+            let regionData = [];
+            if (selectedRegion === 'All Regions') {
+                regionData = allData;
+            } else {
+                regionData = allData.filter(row => row['SBDC Region'] === selectedRegion);
+            }
+
+            const csvContent = Papa.unparse(regionData);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `SBDC_${selectedRegion.replace(/\s+/g, '_')}_Industry_Comparison_Report.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
