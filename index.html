@@ -13,7 +13,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -99,9 +99,9 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
                 <!-- SBDC Region -->
                 <div>
-                    <label for="regionFilter" class="block text-xs font-semibold text-slate-300 mb-2">SBDC Region</label>
+                    <label for="regionFilter" class="block text-xs font-semibold text-slate-300 mb-2">SBDC Region (Single Region Selection)</label>
                     <select id="regionFilter" class="w-full bg-[#1b2b48] border border-slate-600 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-[#CFB991] focus:ring-1 focus:ring-[#CFB991] cursor-pointer">
-                        <option value="all">All Regions (Total Indiana SBDC)</option>
+                        <!-- Populated dynamically (No All Regions) -->
                     </select>
                 </div>
                 <!-- Competitiveness -->
@@ -125,13 +125,10 @@
                         </span>
                     </div>
                 </div>
-                <!-- Buttons -->
-                <div class="flex items-end gap-3">
-                    <button id="resetBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg text-sm transition duration-150 flex items-center justify-center gap-2">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset
-                    </button>
-                    <button id="exportBtn" class="flex-1 bg-[#C28E0E] hover:bg-[#A6790C] text-black font-semibold py-2 px-4 rounded-lg text-sm transition duration-150 flex items-center justify-center gap-2">
-                        <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+                <!-- Reset Button -->
+                <div class="flex items-end">
+                    <button id="resetBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg text-sm transition duration-150 flex items-center justify-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Filters
                     </button>
                 </div>
             </div>
@@ -235,16 +232,16 @@
 
         <!-- Charts Grid 2 -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Chart 3: Scatter Plot -->
+            <!-- Chart 3: Quadrant Bubble Chart -->
             <div class="bg-[#111c30] rounded-xl p-6 border border-slate-700/60 shadow-md lg:col-span-2">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-base font-bold text-white flex items-center gap-2">
-                        <i data-lucide="scatter-chart" class="text-[#CFB991]"></i> Economic Landscape: Specialization vs. Earnings
+                        <i data-lucide="pie-chart" class="text-[#CFB991]"></i> Competitiveness Quadrant Landscape
                     </h3>
                     <span class="text-xs text-slate-400">Bubble size = 2025 Jobs</span>
                 </div>
-                <div class="relative h-[380px] w-full">
-                    <canvas id="scatterChart"></canvas>
+                <div class="relative h-[400px] w-full">
+                    <canvas id="quadrantChart"></canvas>
                 </div>
             </div>
             <!-- Chart 4: Competitiveness Pie -->
@@ -254,7 +251,7 @@
                         <i data-lucide="pie-chart" class="text-[#CFB991]"></i> Competitiveness Distribution
                     </h3>
                 </div>
-                <div class="relative h-[380px] w-full flex items-center justify-center">
+                <div class="relative h-[400px] w-full flex items-center justify-center">
                     <canvas id="pieChart"></canvas>
                 </div>
             </div>
@@ -267,18 +264,10 @@
                     <h3 class="text-lg font-bold text-white flex items-center gap-2">
                         <i data-lucide="table" class="text-[#CFB991]"></i> Industry Cluster Data Table
                     </h3>
-                    <p class="text-xs text-slate-400 mt-1">Detailed metrics for filtered rows. Click column headers to sort.</p>
+                    <p class="text-xs text-slate-400 mt-1">Metrics for all 21 industry clusters. Click column headers to sort.</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span id="tablePageIndicator" class="text-xs text-slate-400">Page 1 of 1</span>
-                    <div class="flex gap-2">
-                        <button id="prevPageBtn" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                        </button>
-                        <button id="nextPageBtn" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                <div>
+                    <span id="tableRecordCount" class="text-xs font-semibold text-[#CFB991] bg-[#CFB991]/10 px-3 py-1.5 rounded-lg border border-[#CFB991]/20">21 Records Shown</span>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -538,10 +527,8 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
         let filteredRows = [];
         let sortColumn = '2025 Jobs';
         let sortDirection = 'desc';
-        let currentPage = 1;
-        const rowsPerPage = 10;
 
-        // Colors
+        // Colors representing classifications with premium theme (Purdue Gold, Emerald, Royal Blue, Crimson)
         const colors = {
             star: '#D1A153',       // Purdue Gold
             emerging: '#10B981',   // Emerald Green
@@ -552,7 +539,7 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
         // Chart instances
         let jobsChart = null;
         let specializationChart = null;
-        let scatterChart = null;
+        let quadrantChart = null;
         let pieChart = null;
 
         // Initialize Application
@@ -572,60 +559,47 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             });
         });
 
-        // Initialize Filter Options
+        // Initialize Filter Options - Force single region selection (no 'all')
         function initFilters() {
-            // SBDC Regions
+            // SBDC Regions sorted alphabetically
             const regions = [...new Set(rawData.map(r => r['SBDC Region']))].sort();
             const regionSelect = document.getElementById('regionFilter');
+            regionSelect.innerHTML = ''; // clear old values
+            
             regions.forEach(reg => {
                 const opt = document.createElement('option');
                 opt.value = reg;
                 opt.textContent = reg;
                 regionSelect.appendChild(opt);
             });
+            // Initial default selection
+            regionSelect.value = regions[0];
         }
 
         // Set up event listeners
         function setupEventListeners() {
-            document.getElementById('regionFilter').addEventListener('change', () => { currentPage = 1; updateDashboard(); });
-            document.getElementById('competitivenessFilter').addEventListener('change', () => { currentPage = 1; updateDashboard(); });
-            document.getElementById('searchFilter').addEventListener('input', () => { currentPage = 1; updateDashboard(); });
+            document.getElementById('regionFilter').addEventListener('change', updateDashboard);
+            document.getElementById('competitivenessFilter').addEventListener('change', updateDashboard);
+            document.getElementById('searchFilter').addEventListener('input', updateDashboard);
 
             document.getElementById('resetBtn').addEventListener('click', () => {
-                document.getElementById('regionFilter').value = 'all';
+                const regionSelect = document.getElementById('regionFilter');
+                regionSelect.selectedIndex = 0; // reset to first region alphabetically
                 document.getElementById('competitivenessFilter').value = 'all';
                 document.getElementById('searchFilter').value = '';
-                currentPage = 1;
                 updateDashboard();
-            });
-
-            document.getElementById('exportBtn').addEventListener('click', exportCSV);
-
-            document.getElementById('prevPageBtn').addEventListener('click', () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    renderTable();
-                }
-            });
-
-            document.getElementById('nextPageBtn').addEventListener('click', () => {
-                const maxPage = Math.ceil(filteredRows.length / rowsPerPage);
-                if (currentPage < maxPage) {
-                    currentPage++;
-                    renderTable();
-                }
             });
         }
 
         // Update Dashboard Core
         function updateDashboard() {
-            // 1. Filter Data
+            // Filter Data based strictly on Single Region selection + Competitiveness & Search
             const regionVal = document.getElementById('regionFilter').value;
             const competitivenessVal = document.getElementById('competitivenessFilter').value;
             const searchVal = document.getElementById('searchFilter').value.toLowerCase();
 
             filteredRows = rawData.filter(row => {
-                const matchesRegion = (regionVal === 'all') || (row['SBDC Region'] === regionVal);
+                const matchesRegion = row['SBDC Region'] === regionVal;
                 const matchesComp = (competitivenessVal === 'all') || (row['Competitiveness'] === competitivenessVal);
                 const matchesSearch = !searchVal || 
                     (row['Cluster Name'] && row['Cluster Name'].toLowerCase().includes(searchVal)) ||
@@ -633,69 +607,17 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 return matchesRegion && matchesComp && matchesSearch;
             });
 
-            // 2. Update KPI Cards
+            // Update KPI Cards
             updateKPIs(filteredRows, regionVal);
 
-            // 3. Aggregate Data for Charts
-            const aggregated = aggregateDataByCluster(filteredRows);
-
-            // 4. Update Charts
-            renderJobsChart(aggregated);
-            renderSpecializationChart(aggregated);
-            renderScatterChart(aggregated);
+            // Update Charts
+            renderJobsChart(filteredRows);
+            renderSpecializationChart(filteredRows);
+            renderQuadrantChart(filteredRows);
             renderPieChart(filteredRows);
 
-            // 5. Render Data Table
+            // Render Data Table (21 rows limit per region)
             renderTable();
-        }
-
-        // Aggregate data by Cluster Name for dynamic calculations
-        function aggregateDataByCluster(data) {
-            const clusterMap = {};
-            data.forEach(row => {
-                const key = row['Cluster Name'];
-                if (!clusterMap[key]) {
-                    clusterMap[key] = {
-                        clusterName: key,
-                        clusterId: row['Cluster ID'],
-                        jobs: 0,
-                        earningsSum: 0,
-                        establishments: 0,
-                        lq2020Sum: 0,
-                        lq2025Sum: 0,
-                        rowCount: 0,
-                        competitivenessList: []
-                    };
-                }
-                clusterMap[key].jobs += row['2025 Jobs'] || 0;
-                clusterMap[key].earningsSum += (row['Earnings Per Worker'] || 0) * (row['2025 Jobs'] || 0);
-                clusterMap[key].establishments += row['Establishments'] || 0;
-                clusterMap[key].lq2020Sum += (row['2020 Employment Concentration'] || 0) * (row['2025 Jobs'] || 0);
-                clusterMap[key].lq2025Sum += (row['2025 Employment Concentration'] || 0) * (row['2025 Jobs'] || 0);
-                clusterMap[key].rowCount++;
-                clusterMap[key].competitivenessList.push(row['Competitiveness']);
-            });
-
-            return Object.values(clusterMap).map(c => {
-                // Determine dominant competitiveness if multiple rows exist
-                let finalComp = c.competitivenessList[0];
-                if (c.competitivenessList.length > 1) {
-                    const counts = {};
-                    c.competitivenessList.forEach(x => { counts[x] = (counts[x] || 0) + 1; });
-                    finalComp = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-                }
-
-                return {
-                    clusterName: c.clusterName,
-                    clusterId: c.clusterId,
-                    jobs: c.jobs,
-                    earnings: c.jobs > 0 ? (c.earningsSum / c.jobs) : 0,
-                    establishments: c.establishments,
-                    lq2020: c.jobs > 0 ? (c.lq2020Sum / c.jobs) : 0,
-                    lq2025: c.jobs > 0 ? (c.lq2025Sum / c.jobs) : 0,
-                    competitiveness: finalComp
-                };
-            });
         }
 
         // Update KPI Card Numbers
@@ -715,18 +637,12 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             animateValue('kpiEarnings', avgEarnings, true, true);
             animateValue('kpiEstablishments', totalEstablishments, true);
             document.getElementById('kpiSpecialized').innerText = specializedCount.toLocaleString();
-
-            const earningsSub = document.getElementById('kpiEarningsSub');
-            if (selectedRegion === 'all') {
-                earningsSub.innerText = "Weighted Avg State-Level";
-            } else {
-                earningsSub.innerText = `Weighted Avg for ${selectedRegion}`;
-            }
+            document.getElementById('kpiEarningsSub').innerText = `Weighted Avg for ${selectedRegion}`;
         }
 
         function animateValue(id, value, isInteger = false, isCurrency = false) {
             const el = document.getElementById(id);
-            const duration = 500; // ms
+            const duration = 400; // ms
             const startTime = performance.now();
             const startVal = parseFloat(el.innerText.replace(/[^0-9.-]+/g, '')) || 0;
             const endVal = value;
@@ -762,13 +678,13 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             const ctx = document.getElementById('jobsChart').getContext('2d');
             
             // Sort clusters descending by jobs
-            const sorted = [...data].sort((a, b) => b.jobs - a.jobs);
+            const sorted = [...data].sort((a, b) => b['2025 Jobs'] - a['2025 Jobs']);
             
-            const labels = sorted.map(d => d.clusterName.length > 32 ? d.clusterName.substring(0, 30) + '...' : d.clusterName);
-            const fullLabels = sorted.map(d => d.clusterName);
-            const jobsData = sorted.map(d => d.jobs);
-            const backgroundColors = sorted.map(d => getCompColor(d.competitiveness, 0.75));
-            const borderColors = sorted.map(d => getCompColor(d.competitiveness, 1.0));
+            const labels = sorted.map(d => d['Cluster Name'].length > 32 ? d['Cluster Name'].substring(0, 30) + '...' : d['Cluster Name']);
+            const fullLabels = sorted.map(d => d['Cluster Name']);
+            const jobsData = sorted.map(d => d['2025 Jobs']);
+            const backgroundColors = sorted.map(d => getCompColor(d['Competitiveness'], 0.75));
+            const borderColors = sorted.map(d => getCompColor(d['Competitiveness'], 1.0));
 
             if (jobsChart) {
                 jobsChart.destroy();
@@ -823,12 +739,12 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             const ctx = document.getElementById('specializationChart').getContext('2d');
             
             // Sort descending by jobs and take top 8 clusters to prevent clutter
-            const sorted = [...data].sort((a, b) => b.jobs - a.jobs).slice(0, 8);
+            const sorted = [...data].sort((a, b) => b['2025 Jobs'] - a['2025 Jobs']).slice(0, 8);
             
-            const labels = sorted.map(d => d.clusterId);
-            const fullNames = sorted.map(d => d.clusterName);
-            const lq2020 = sorted.map(d => d.lq2020);
-            const lq2025 = sorted.map(d => d.lq2025);
+            const labels = sorted.map(d => d['Cluster ID']);
+            const fullNames = sorted.map(d => d['Cluster Name']);
+            const lq2020 = sorted.map(d => d['2020 Employment Concentration']);
+            const lq2025 = sorted.map(d => d['2025 Employment Concentration']);
 
             if (specializationChart) {
                 specializationChart.destroy();
@@ -895,49 +811,50 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             });
         }
 
-        // Render Chart 3: Scatter Plot (Specialization vs Earnings)
-        function renderScatterChart(data) {
-            const ctx = document.getElementById('scatterChart').getContext('2d');
+        // Render Chart 3: Quadrant Bubble Chart
+        // X-axis: 2025 LQ (Threshold = 1.0)
+        // Y-axis: Percent Change Employment Concentration (Threshold = 0.0)
+        function renderQuadrantChart(data) {
+            const ctx = document.getElementById('quadrantChart').getContext('2d');
 
-            // Organize by Competitiveness dataset groups
             const categories = ['Star', 'Emerging', 'Mature', 'Transforming'];
             
-            // Dynamically scale point sizes
-            const jobsArr = data.map(d => d.jobs);
+            // Scaler helper for bubble sizes
+            const jobsArr = data.map(d => d['2025 Jobs'] || 0);
             const maxJobs = Math.max(...jobsArr, 1);
             const minJobs = Math.min(...jobsArr, 0);
 
             const datasets = categories.map(cat => {
-                const catData = data.filter(d => d.competitiveness === cat);
+                const catData = data.filter(d => d['Competitiveness'] === cat);
                 return {
                     label: cat,
                     data: catData.map(d => {
                         let r = 6;
                         if (maxJobs > minJobs) {
-                            r = 5 + ((d.jobs - minJobs) / (maxJobs - minJobs)) * 22;
+                            r = 5 + (((d['2025 Jobs'] || 0) - minJobs) / (maxJobs - minJobs)) * 20;
                         }
                         return {
-                            x: d.lq2025,
-                            y: d.earnings,
+                            x: d['2025 Employment Concentration'] || 0,
+                            y: d['Percent Change Employment Concentration'] || 0,
                             r: r,
-                            label: d.clusterName,
-                            id: d.clusterId,
-                            jobs: d.jobs,
-                            establishments: d.establishments
+                            label: d['Cluster Name'],
+                            id: d['Cluster ID'],
+                            jobs: d['2025 Jobs'] || 0,
+                            lq2020: d['2020 Employment Concentration'] || 0
                         };
                     }),
-                    backgroundColor: getCompColor(cat, 0.65),
+                    backgroundColor: getCompColor(cat, 0.7),
                     borderColor: getCompColor(cat, 1.0),
                     borderWidth: 1.5,
-                    hoverRadius: 10
+                    hoverRadius: 8
                 };
             });
 
-            if (scatterChart) {
-                scatterChart.destroy();
+            if (quadrantChart) {
+                quadrantChart.destroy();
             }
 
-            scatterChart = new Chart(ctx, {
+            quadrantChart = new Chart(ctx, {
                 type: 'bubble',
                 data: { datasets: datasets },
                 options: {
@@ -952,12 +869,12 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                             callbacks: {
                                 label: function(context) {
                                     const p = context.raw;
+                                    const pctStr = (p.y * 100).toFixed(1) + '%';
                                     return [
                                         `${p.id}: ${p.label}`,
                                         `  2025 LQ: ${p.x.toFixed(2)}`,
-                                        `  Earnings: $${Math.round(p.y).toLocaleString()}/yr`,
-                                        `  Jobs: ${Math.round(p.jobs).toLocaleString()}`,
-                                        `  Establishments: ${Math.round(p.establishments).toLocaleString()}`
+                                        `  Change in Concentration: ${pctStr}`,
+                                        `  2025 Jobs: ${Math.round(p.jobs).toLocaleString()}`
                                     ];
                                 }
                             }
@@ -965,30 +882,78 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                     },
                     scales: {
                         x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
                             ticks: { color: '#cbd5e1' },
                             title: {
                                 display: true,
-                                text: 'Employment Concentration / Specialization (2025 Location Quotient)',
+                                text: 'Employment Specialization (2025 Location Quotient)',
                                 color: '#94a3b8',
                                 font: { size: 11 }
                             }
                         },
                         y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
                             ticks: {
                                 color: '#cbd5e1',
-                                callback: function(value) { return '$' + value.toLocaleString(); }
+                                callback: function(value) { return (value * 100).toFixed(0) + '%'; }
                             },
                             title: {
                                 display: true,
-                                text: 'Earnings Per Worker ($)',
+                                text: 'Concentration Percent Change',
                                 color: '#94a3b8',
                                 font: { size: 11 }
                             }
                         }
                     }
-                }
+                },
+                // Plugin to draw reference boundary lines & quadrant label overlays
+                plugins: [{
+                    id: 'quadrantDecorations',
+                    afterDraw: function(chart) {
+                        const chartCtx = chart.ctx;
+                        const xAxis = chart.scales.x;
+                        const yAxis = chart.scales.y;
+                        
+                        chartCtx.save();
+                        chartCtx.strokeStyle = 'rgba(207, 185, 145, 0.4)'; // semi-transparent gold
+                        chartCtx.lineWidth = 1.5;
+                        chartCtx.setLineDash([5, 5]);
+                        
+                        // Vertical threshold line at LQ = 1.0
+                        const xPixel = xAxis.getPixelForValue(1.0);
+                        if (xPixel >= xAxis.left && xPixel <= xAxis.right) {
+                            chartCtx.beginPath();
+                            chartCtx.moveTo(xPixel, yAxis.top);
+                            chartCtx.lineTo(xPixel, yAxis.bottom);
+                            chartCtx.stroke();
+                        }
+                        
+                        // Horizontal threshold line at Percent Change = 0.0
+                        const yPixel = yAxis.getPixelForValue(0.0);
+                        if (yPixel >= yAxis.top && yPixel <= yAxis.bottom) {
+                            chartCtx.beginPath();
+                            chartCtx.moveTo(xAxis.left, yPixel);
+                            chartCtx.lineTo(xAxis.right, yPixel);
+                            chartCtx.stroke();
+                        }
+                        
+                        // Quadrant overlays
+                        chartCtx.setLineDash([]);
+                        chartCtx.font = 'bold 10px Inter, sans-serif';
+                        chartCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                        
+                        // 1. Top-Right (Star)
+                        chartCtx.fillText('★ STAR (LQ > 1, Growing)', xAxis.right - 150, yAxis.top + 20);
+                        // 2. Top-Left (Emerging)
+                        chartCtx.fillText('▲ EMERGING (LQ < 1, Growing)', xAxis.left + 15, yAxis.top + 20);
+                        // 3. Bottom-Right (Mature)
+                        chartCtx.fillText('● MATURE (LQ > 1, Declining)', xAxis.right - 150, yAxis.bottom - 15);
+                        // 4. Bottom-Left (Transforming)
+                        chartCtx.fillText('■ TRANSFORMING (LQ < 1, Declining)', xAxis.left + 15, yAxis.bottom - 15);
+                        
+                        chartCtx.restore();
+                    }
+                }]
             });
         }
 
@@ -1053,9 +1018,8 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             });
         }
 
-        // Table Sort & Pagination Render logic
+        // Table Sort & Render logic - Always renders exactly 21 rows per region (no pagination needed)
         function handleSort(columnName) {
-            // Sort column mappings
             const mapping = {
                 'Cluster ID': 'Cluster ID',
                 'Cluster Name': 'Cluster Name',
@@ -1074,7 +1038,6 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 sortColumn = key;
                 sortDirection = 'desc';
             }
-            currentPage = 1;
             renderTable();
         }
 
@@ -1084,7 +1047,6 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 let valA = a[sortColumn];
                 let valB = b[sortColumn];
 
-                // Handle string or numeric sorting
                 if (typeof valA === 'string') {
                     return sortDirection === 'asc' 
                         ? valA.localeCompare(valB) 
@@ -1096,20 +1058,10 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 }
             });
 
-            // Pagination window
-            const maxPage = Math.max(1, Math.ceil(sorted.length / rowsPerPage));
-            if (currentPage > maxPage) currentPage = maxPage;
+            // Update record indicator count label
+            document.getElementById('tableRecordCount').innerText = `${sorted.length} Records Shown`;
 
-            const startIdx = (currentPage - 1) * rowsPerPage;
-            const endIdx = startIdx + rowsPerPage;
-            const pageRows = sorted.slice(startIdx, endIdx);
-
-            // Update UI indicators
-            document.getElementById('tablePageIndicator').innerText = `Page ${currentPage} of ${maxPage} (${sorted.length} records)`;
-            document.getElementById('prevPageBtn').disabled = currentPage === 1;
-            document.getElementById('nextPageBtn').disabled = currentPage === maxPage;
-
-            // Update sort icon indicators
+            // Update sort icon indicators on table headers
             const columns = ['Cluster ID', 'Cluster Name', 'SBDC Region', '2025 Jobs', 'Earnings Per Worker', 'Establishments', '2025 Employment Concentration', 'Competitiveness'];
             columns.forEach(col => {
                 const cleanId = col.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
@@ -1125,11 +1077,11 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 }
             });
 
-            // Render table body rows
+            // Render table body rows (always up to 21 active clusters)
             const tableBody = document.getElementById('tableBody');
             tableBody.innerHTML = '';
 
-            if (pageRows.length === 0) {
+            if (sorted.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
                         <td colspan="8" class="p-8 text-center text-slate-500 italic">
@@ -1140,11 +1092,10 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
                 return;
             }
 
-            pageRows.forEach(row => {
+            sorted.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-[#16243d]/40 transition-colors border-b border-slate-800/80';
 
-                // Badges style for competitiveness
                 let badgeClass = 'bg-slate-700/20 text-slate-300 border-slate-600/30';
                 if (row['Competitiveness'] === 'Star') badgeClass = 'bg-[#D1A153]/15 text-[#D1A153] border-[#D1A153]/30';
                 if (row['Competitiveness'] === 'Emerging') badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -1178,44 +1129,6 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             const g = parseInt(hex.slice(3, 5), 16);
             const b = parseInt(hex.slice(5, 7), 16);
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        }
-
-        // Export table data to CSV format
-        function exportCSV() {
-            if (filteredRows.length === 0) {
-                alert('No data available to export.');
-                return;
-            }
-
-            const header = ['Cluster ID', 'Cluster Name', '2025 Jobs', 'Earnings Per Worker', 'Establishments', '2020 Employment Concentration', '2025 Employment Concentration', 'Percent Change Employment Concentration', 'SBDC Region', 'Competitiveness'];
-            let csvRows = [header.join(',')];
-
-            filteredRows.forEach(row => {
-                const values = header.map(h => {
-                    let cell = row[h];
-                    if (typeof cell === 'string') {
-                        // Double quotes check
-                        cell = `"${cell.replace(/"/g, '""')}"`;
-                    } else if (cell === null || cell === undefined) {
-                        cell = '';
-                    }
-                    return cell;
-                });
-                csvRows.push(values.join(','));
-            });
-
-            const csvContent = csvRows.join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            
-            const regionVal = document.getElementById('regionFilter').value;
-            const cleanRegion = regionVal.replace(/\s+/g, '_');
-            link.setAttribute("download", `SBDC_Industry_Cluster_Report_${cleanRegion}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
     </script>
 </body>
