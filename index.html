@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,7 +61,7 @@
             </div>
             
             <div class="flex items-center gap-3">
-                <!-- Theme Switcher Button in Top Right Corner -->
+                <!-- Theme Switcher Button in Top Right Corner - Default Light Mode -->
                 <button id="themeToggle" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#111c30] dark:hover:bg-[#1a293f] text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 transition-colors shadow-sm select-none">
                     <span class="dark:hidden flex items-center gap-2 font-semibold text-xs">
                         <i data-lucide="moon" class="w-4.5 h-4.5 text-slate-600"></i> Dark Mode
@@ -548,16 +548,18 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
         let quadrantChart = null;
         let pieChart = null;
 
-        // Simple Bulletproof Light / Dark Toggle System
+        // Simple Bulletproof Light / Dark Toggle System - Defaults to Light Mode on load
         const themeToggle = document.getElementById('themeToggle');
         
         function applyTheme(isDark) {
             const htmlEl = document.documentElement;
             if (isDark) {
                 htmlEl.classList.add('dark');
+                htmlEl.classList.remove('light');
                 localStorage.setItem('dashboard-theme', 'dark');
             } else {
                 htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
                 localStorage.setItem('dashboard-theme', 'light');
             }
             if (rawData && rawData.length > 0) {
@@ -571,8 +573,8 @@ IC21,Transportation Equipment Manufacturing,3009.204439,76350.90921,71.75,1.8211
             applyTheme(!isCurrentlyDark);
         });
 
-        // Initialize theme strictly as dark on first run (safely parsed)
-        const savedTheme = localStorage.getItem('dashboard-theme') || 'dark';
+        // Initialize saved theme or default to Light Mode
+        const savedTheme = localStorage.getItem('dashboard-theme') || 'light';
         applyTheme(savedTheme === 'dark');
 
         function isDarkActive() {
